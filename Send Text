@@ -1,0 +1,53 @@
+Option Explicit
+
+Sub SendTelegramMessage()
+    Dim http As Object
+    Dim url As String
+    Dim botToken As String
+    Dim chatID As String
+    Dim message As String
+
+    ' Your bot token
+    botToken = "7"
+
+    ' Your chat ID
+    chatID = ""
+
+    ' Your message
+    message = "Tes bot "
+
+    ' Create the URL
+    url = "https://api.telegram.org/bot" & botToken & "/sendMessage?chat_id=" & chatID & "&text=" & URLEncode(message)
+
+    ' Create the HTTP object
+    Set http = CreateObject("MSXML2.XMLHTTP")
+    http.Open "GET", url, False
+    http.Send
+
+    ' Check the response
+    If http.Status = 200 Then
+        MsgBox "Message sent successfully!"
+    Else
+        MsgBox "Failed to send message. Status: " & http.Status & " - " & http.StatusText
+    End If
+End Sub
+
+Function URLEncode(Text As String) As String
+    Dim i As Long
+    Dim Char As String
+    Dim EncodedText As String
+    
+    EncodedText = ""
+    For i = 1 To Len(Text)
+        Char = Mid(Text, i, 1)
+        Select Case Asc(Char)
+            Case 48 To 57, 65 To 90, 97 To 122  ' Alphanumeric characters
+                EncodedText = EncodedText & Char
+            Case Else
+                EncodedText = EncodedText & "%" & Hex(Asc(Char))
+        End Select
+    Next i
+    
+    URLEncode = EncodedText
+End Function
+
