@@ -18,7 +18,7 @@ Sub SendTelegramMessage()
             & "This is a new line"
 
     ' Create the URL
-    url = "https://api.telegram.org/bot" & botToken & "/sendMessage?chat_id=" & chatID & "&text=" & URLEncode(message)
+    url = "https://api.telegram.org/bot" & botToken & "/sendMessage?chat_id=" & chatID & "&text=" & message
 
     ' Create the HTTP object
     Set http = CreateObject("MSXML2.XMLHTTP")
@@ -32,23 +32,4 @@ Sub SendTelegramMessage()
         MsgBox "Failed to send message. Status: " & http.Status & " - " & http.StatusText
     End If
 End Sub
-
-Function URLEncode(Text As String) As String
-    Dim i As Long
-    Dim Char As String
-    Dim EncodedText As String
-    
-    EncodedText = ""
-    For i = 1 To Len(Text)
-        Char = Mid(Text, i, 1)
-        Select Case Asc(Char)
-            Case 48 To 57, 65 To 90, 97 To 122  ' Alphanumeric characters
-                EncodedText = EncodedText & Char
-            Case Else
-                EncodedText = EncodedText & "%" & Hex(Asc(Char))
-        End Select
-    Next i
-    
-    URLEncode = EncodedText
-End Function
 
