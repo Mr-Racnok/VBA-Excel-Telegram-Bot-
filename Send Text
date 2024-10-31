@@ -8,13 +8,13 @@ Sub SendTelegramMessage()
     Dim message As String
 
     ' Your bot token
-    botToken = "7"
+    botToken = "7253040182:AAFnu-B6oTRUym4mpUbOTfmxsDOr-1Dl4Dk"
 
     ' Your chat ID
-    chatID = ""
+    chatID = "-1002417068154"
 
     ' Your message
-    message = "Tes bot "
+    message = "Tes ggg "
 
     ' Create the URL
     url = "https://api.telegram.org/bot" & botToken & "/sendMessage?chat_id=" & chatID & "&text=" & URLEncode(message)
@@ -22,7 +22,7 @@ Sub SendTelegramMessage()
     ' Create the HTTP object
     Set http = CreateObject("MSXML2.XMLHTTP")
     http.Open "GET", url, False
-    http.Send
+    http.send
 
     ' Check the response
     If http.Status = 200 Then
