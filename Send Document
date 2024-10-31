@@ -1,0 +1,71 @@
+Option Explicit
+
+Sub Send_Document()
+    Const URL = "https://api.telegram.org/bot"
+    Const TOKEN = "7253040182:AAFnu-B6oTRUym4mpUbOTfmxsDOr-1Dl4Dk"
+    Const METHOD_NAME = "/sendDocument"
+    Const CHAT_ID = "-1002277315496"
+    Const DOCUMENT_PATH = "C:\Users\ASUS\Desktop\7777\Screenshot_2019-01-06-23-14-42-853_com.miui.gallery.png"
+
+    ' Check if file exists
+    If Dir(DOCUMENT_PATH) = "" Then
+        MsgBox "The file does not exist at the specified path.", vbExclamation, "File Not Found"
+        Exit Sub
+    End If
+
+    ' Create boundary
+    Dim BOUNDARY As String, n As Integer
+    For n = 1 To 16: BOUNDARY = BOUNDARY & Chr(65 + Int(Rnd * 25)): Next
+    BOUNDARY = BOUNDARY & CDbl(Now)
+
+    ' Create HTTP object
+    Dim http As Object
+    Set http = CreateObject("MSXML2.ServerXMLHTTP.6.0")
+
+    ' Create part data
+    Dim part As String
+    part = "--" & BOUNDARY & vbCrLf & "Content-Disposition: form-data; name=""chat_id""" & vbCrLf & vbCrLf & CHAT_ID & vbCrLf
+    part = part & "--" & BOUNDARY & vbCrLf & "Content-Disposition: form-data; name=""document""; filename=""" & DOCUMENT_PATH & """" & vbCrLf & "Content-Type: application/pdf" & vbCrLf & vbCrLf
+
+    ' Read document file as binary
+    Dim doc As Variant, ado As Object
+    Set ado = CreateObject("ADODB.Stream")
+    ado.Type = 1 ' Binary
+    ado.Open
+    ado.LoadFromFile DOCUMENT_PATH
+    ado.Position = 0
+    doc = ado.read
+    ado.Close
+
+    ' Combine part, document, and end
+    ado.Open
+    ado.Type = 1 ' Binary
+    ado.Write ToBytes(part)
+    ado.Write doc
+    ado.Write ToBytes(vbCrLf & "--" & BOUNDARY & "--")
+    ado.Position = 0
+
+    ' Send request
+    With http
+        .Open "POST", URL & TOKEN & METHOD_NAME, False
+        .setRequestHeader "Content-Type", "multipart/form-data; boundary=" & BOUNDARY
+        .send ado.read
+        'MsgBox .responseText
+    End With
+
+    ado.Close
+End Sub
+
+Function ToBytes(str As String) As Variant
+    Dim ado As Object
+    Set ado = CreateObject("ADODB.Stream")
+    ado.Open
+    ado.Type = 2 ' Text
+    ado.Charset = "_autodetect"
+    ado.WriteText str
+    ado.Position = 0
+    ado.Type = 1 ' Binary
+    ToBytes = ado.read
+    ado.Close
+End Function
+
