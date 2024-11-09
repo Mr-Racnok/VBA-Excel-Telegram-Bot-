@@ -2,17 +2,17 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 # Token bot kamu
-TOKEN = 'YOUR_BOT_TOKEN_HERE'
+TOKEN = '7253040182:AAFnu-B6oTRUym4mpUbOTfmxsDOr-1Dl4Dk'
 
 # Fungsi untuk menangani perintah /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    user_id = update.message.from_user.id  # Mendapatkan ID Telegram pengguna
+    chat_id = update.message.chat.id  # Mendapatkan Chat ID dari pengguna
     
-    # Menyimpan ID di memori sementara (session)
-    context.user_data['user_id'] = user_id
+    # Menyimpan Chat ID di memori sementara (session)
+    context.user_data['chat_id'] = chat_id
     
     # Menyapa pengguna dan memberi konfirmasi
-    await update.message.reply_text(f"Hello! ID Telegram Anda ({user_id}) telah disimpan di sesi.")
+    await update.message.reply_text(f"Hello! Chat ID Anda ({chat_id}) telah disimpan di sesi.")
 
 def main() -> None:
     # Setup bot
