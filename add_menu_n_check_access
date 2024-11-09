@@ -1,0 +1,70 @@
+import sqlite3
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, ContextTypes
+
+# Token bot kamu
+TOKEN = '7253040182:AAFnu-B6oTRUym4mpUbOTfmxsDOr-1Dl4Dk'
+
+# Fungsi untuk koneksi ke database dan memeriksa chat_id
+def check_user_in_db(chat_id: int):
+    DB_PATH = r'C:\Users\ASUS\Documents\V12\Development\V12.db'  # Path ke database SQLite
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    # Query untuk mencari chat_id di user_controls
+    cursor.execute("SELECT chat_id FROM tele_user_controls WHERE chat_id = ?", (chat_id,))
+    result = cursor.fetchone()  # Mengambil satu baris hasil (jika ada)
+
+    conn.close()  # Menutup koneksi
+    return result
+
+# Fungsi untuk menangani perintah /start
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat_id = update.message.chat.id  # Mendapatkan Chat ID dari pengguna
+    
+    # Mengecek apakah chat_id ada di database
+    user_data = check_user_in_db(chat_id)
+    
+    if user_data:
+        # Jika ditemukan, menambahkan tombol menu
+        keyboard = [
+            [
+                InlineKeyboardButton("Produksi Hasil Grading", callback_data='ProduksiGrading'),
+                InlineKeyboardButton("Finance HPP Grading", callback_data='FinanceGrading')
+            ],
+            [
+                InlineKeyboardButton("Produksi Hasil Adjust", callback_data='ProduksiAdjust'),
+                InlineKeyboardButton("Unavailable", callback_data='unavailable1')
+            ],
+            [
+                InlineKeyboardButton("Produksi Daily Stok", callback_data='ProduksiStock'),
+                InlineKeyboardButton("Unavailable", callback_data='unavailable1')
+            ],
+            [
+                InlineKeyboardButton("Produksi Rework", callback_data='ProduksiRework'),
+                InlineKeyboardButton("Unavailable", callback_data='unavailable1')
+            ],
+            [
+                InlineKeyboardButton("Produksi Produktivitas", callback_data='ProduksiProductivity'),
+                InlineKeyboardButton("Unavailable", callback_data='unavailable1')
+            ]
+        ]
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text("Silakan pilih menu berikut:", reply_markup=reply_markup)
+    else:
+        # Jika tidak ditemukan
+        await update.message.reply_text("Akun anda tidak memiliki akses.")
+
+def main() -> None:
+    # Setup bot
+    application = Application.builder().token(TOKEN).build()
+
+    # Menambahkan handler untuk perintah /start
+    application.add_handler(CommandHandler("start", start))
+
+    # Menjalankan bot
+    application.run_polling()
+
+if __name__ == '__main__':
+    main()
