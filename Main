@@ -1,0 +1,218 @@
+import os
+import sqlite3
+from datetime import datetime
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, ConversationHandler, MessageHandler, filters
+import openpyxl
+import shutil
+import time
+import xlwings as xw
+#pip install openpyxl
+#pip install xlwings
+
+# Token bot kamu
+TOKEN = '7253040182:AAFnu-B6oTRUym4mpUbOTfmxsDOr-1Dl4Dk'
+
+# State untuk percakapan
+TANGGAL_PERTAMA, TANGGAL_KEDUA = range(2)
+
+# Fungsi untuk koneksi ke database dan memeriksa chat_id
+def check_user_in_db(chat_id: int):
+    DB_PATH = r'\\192.168.33.2\SQLite\v12\v12.db'  # Path ke database SQLite
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT chat_id FROM tele_user_controls WHERE chat_id = ?", (chat_id,))
+    result = cursor.fetchone()
+    conn.close()
+    return result
+
+# Fungsi untuk memeriksa akses pengguna di database berdasarkan menu
+def check_user_access_in_db(chat_id: int, menu_name: str):
+    DB_PATH = r'\\192.168.33.2\SQLite\v12\v12.db'  # Path ke database SQLite
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM tele_user_controls WHERE chat_id = ? AND chat_access = ?", (chat_id, menu_name))
+    result = cursor.fetchone()
+    conn.close()
+    return result
+
+# Fungsi untuk mengambil data dari finance_grading_summary berdasarkan rentang tanggal
+def get_tanggal_grading_finance(tanggalpertama: str, tanggalkedua: str):
+    DB_PATH = r'\\192.168.33.2\SQLite\v12\v12.db'  # Path ke database SQLite
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM finance_grading_summary WHERE tanggal_grading BETWEEN ? AND ?", (tanggalpertama, tanggalkedua))
+    result = cursor.fetchall()
+    conn.close()
+    return result
+
+# Fungsi untuk menyimpan data ke file Excel dan mengirimkannya ke pengguna
+#def save_data_to_excel(data, chat_id):
+    # Tentukan nama file berdasarkan chat_id dan waktu saat ini
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    filename = f"{chat_id}{timestamp}.xlsx"
+    filepath = os.path.join(os.getcwd(), filename)  # Menyimpan di folder yang sama dengan bot.py
+
+    # Salin template FGK_byTanggalGrading
+    template_file = "FGK_byTanggalGrading.xlsx"
+    shutil.copy(template_file, filepath)
+
+    # Load template
+    wb = openpyxl.load_workbook(filepath)
+    sheet = wb['Summary']
+
+    # Menulis data ke dalam sheet Excel dimulai dari A2
+    for i, row in enumerate(data, start=2):  # Mulai dari baris kedua
+        for j, value in enumerate(row, start=1):  # Mulai dari kolom pertama
+            sheet.cell(row=i, column=j, value=value)
+
+    # Simpan file
+    wb.save(filepath)
+    wb.close()
+
+    return filepath
+
+# Fungsi untuk menangani perintah /start
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat_id = update.message.chat.id
+    user_data = check_user_in_db(chat_id)
+    if user_data:
+        keyboard = [
+            [
+                InlineKeyboardButton("Produksi Hasil Grading", callback_data='ProduksiGrading'),
+                InlineKeyboardButton("Finance HPP Grading", callback_data='FinanceGrading')
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text("Silakan pilih menu berikut:", reply_markup=reply_markup)
+    else:
+        await update.message.reply_text("Akun anda tidak memiliki akses.")
+
+# Fungsi untuk menangani klik tombol
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    chat_id = query.message.chat_id
+    await query.answer()
+
+    if query.data == 'FinanceGrading':
+        user_data = check_user_access_in_db(chat_id, 'FinanceGrading')
+        if user_data:
+            keyboard = [
+                [InlineKeyboardButton("Finance - Grading Kasar", callback_data='FinanceGradingKasar')],
+                [InlineKeyboardButton("Finance - Grading Halus", callback_data='FinanceGradingHalus')],
+                [InlineKeyboardButton("Finance - Final Grading", callback_data='FinanceFinalGrading')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text("Pilih opsi untuk Finance HPP Grading:", reply_markup=reply_markup)
+        else:
+            await query.delete_message()
+            await query.message.reply_text("Akun anda tidak memiliki akses untuk Finance HPP Grading.")
+
+    elif query.data == 'FinanceGradingKasar':
+        user_data = check_user_access_in_db(chat_id, 'FinanceGradingKasar')
+        if user_data:
+            keyboard = [
+                [InlineKeyboardButton("by Nomor Grading", callback_data='FGK_byNomorGrading')],
+                [InlineKeyboardButton("by Tanggal Grading", callback_data='FGK_byTanggalGrading')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text("Pilih opsi untuk melihat data:", reply_markup=reply_markup)
+        else:
+            await query.delete_message()
+            await query.message.reply_text("Akun anda tidak memiliki akses untuk FGK_byNomorGrading.")
+
+    elif query.data == 'FGK_byTanggalGrading':
+        await query.edit_message_text("Silakan masukkan tanggal pertama: (yyyy-mm-dd)")
+        return TANGGAL_PERTAMA
+
+# Fungsi untuk menangani input tanggal pertama dari pengguna
+async def handle_tanggal_pertama(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    # Menyimpan tanggal pertama dalam user_data
+    context.user_data['tanggalpertama'] = update.message.text
+    await update.message.reply_text("Silakan masukkan tanggal kedua: (yyyy-mm-dd)")
+    return TANGGAL_KEDUA
+
+# Fungsi untuk menangani input tanggal kedua dan menghasilkan file
+async def handle_tanggal_kedua(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    chat_id = update.message.chat.id
+    tanggalpertama = context.user_data['tanggalpertama']
+    tanggalkedua = update.message.text  # Tanggal kedua yang dimasukkan oleh pengguna
+    
+    # Ambil data dari database berdasarkan rentang tanggal
+    result = get_tanggal_grading_finance(tanggalpertama, tanggalkedua)
+    
+    if result:
+        # Salin template file FGK_byTanggalGrading.xlsm
+        template_path = 'FGK_byTanggalGrading.xlsm'
+        
+        # Buat nama file baru berdasarkan chat_id dan waktu saat ini
+        timestamp = time.strftime("%Y%m%d%H%M%S")
+        new_file_name = f"{chat_id}{timestamp}.xlsm"
+        new_file_path = os.path.join(os.getcwd(), new_file_name)
+        
+        # Salin file template ke file baru
+        shutil.copy(template_path, new_file_path)
+        
+        # Buka file Excel dengan xlwings untuk menjaga VBA dan format
+        app = xw.App(visible=False)  # Jangan tampilkan Excel selama pemrosesan
+        wb = app.books.open(new_file_path)
+        sheet = wb.sheets['Summary']
+        
+        # Masukkan data ke dalam sheet mulai dari cell A2
+        for row_num, row_data in enumerate(result, start=2):
+            for col_num, value in enumerate(row_data, start=1):
+                # Menggunakan sheet.range untuk mengakses sel berdasarkan baris dan kolom
+                sheet.range(row_num, col_num).value = value
+        
+        # Simpan file setelah data dimasukkan
+        wb.save()
+        wb.close()
+        app.quit()
+        
+        # Kirim file kepada pengguna
+        await update.message.reply_document(document=open(new_file_path, 'rb'), filename=new_file_name)
+        
+        # Hapus file setelah dikirimkan
+        os.remove(new_file_path)
+
+    else:
+        await update.message.reply_text("Data tidak ditemukan untuk rentang tanggal tersebut.")
+    
+    return ConversationHandler.END
+
+
+# Fungsi untuk membatalkan percakapan
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await update.message.reply_text("Proses dibatalkan.")
+    return ConversationHandler.END
+
+# Fungsi untuk membatalkan percakapan
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await update.message.reply_text("Proses dibatalkan.")
+    return ConversationHandler.END
+
+# Fungsi utama untuk menjalankan bot
+def main() -> None:
+    application = Application.builder().token(TOKEN).build()
+
+    # Setup ConversationHandler
+    conv_handler = ConversationHandler(
+        entry_points=[CallbackQueryHandler(button_handler)],
+        states={
+            TANGGAL_PERTAMA: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_tanggal_pertama)],
+            TANGGAL_KEDUA: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_tanggal_kedua)],
+        },
+        fallbacks=[CommandHandler("cancel", cancel)],
+    )
+
+    # Menambahkan handler untuk perintah /start
+    application.add_handler(CommandHandler("start", start))
+    
+    # Menambahkan ConversationHandler
+    application.add_handler(conv_handler)
+
+    # Menjalankan bot
+    application.run_polling()
+
+if __name__ == '__main__':
+    main()
